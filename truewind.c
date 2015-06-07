@@ -6,7 +6,10 @@
 #include <unistd.h>
 #include <string.h>
 
-/* see http://www.catb.org/gpsd/NMEA.html
+/*
+* Developed by: Tony Miller, tony.miller@eightyoptions.com
+*
+* see http://www.catb.org/gpsd/NMEA.html
 * for a good NMEA reference
 */
 
