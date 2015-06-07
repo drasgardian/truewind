@@ -1,18 +1,21 @@
 ******** ABOUT TRUE WIND ********
 
-truewind calculated true wind direction and speed given apparent wind direction,
+Truewind calculates true wind direction and speed given apparent wind direction,
 apparent wind speed and boat speed.
 
 Note that some call this "Boat Wind" and is different from the sort of true wind
 that would be calculated using GPS speed and heading.
 
-truewind reads in NMEA strings and generates NMEA strings.
+Truewind reads in NMEA strings and generates NMEA strings.
 
 Supported input NMEA strings:
 VHW, VWR and MWV (with Reference = R);
 
 Supported output NMEA strings
 MWV (Reference = T);
+
+A basic shell script (test-input.sh) has been included to generate some NMEA
+test data. Truewind can consume this directly, or you can feed it via KPlex.
 
 Developed by: Tony Miller, tony.miller@eightyoptions.com
 
