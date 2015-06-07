@@ -14,7 +14,37 @@ double trueWindSpeed(double, double, double);
 double trueWindDirection(double, double, double);
 bool writeNMEATrueWind(double, double, double, char, char, char);
 
-main() {
+char *nmeaInput;
+char *nmeaOutput;
+
+main(int argc, char **argv) {
+
+  if (argc != 3) {
+    printf("Usage:\ntruewind -if=input_file_name -of=output_file_name\n");
+    exit(EXIT_FAILURE);
+  }
+
+  int i;
+  for (i = 1; i < 3; i++) {
+    char argType[4];
+    strncpy(argType, argv[i], 4);
+    if (strcmp(argType, "-if=") ==0) {
+      nmeaInput = argv[i];
+      nmeaInput = nmeaInput+4;
+    }
+
+    if (strcmp(argType, "-of=") ==0) {
+      nmeaOutput = argv[i];
+      nmeaOutput = nmeaOutput+4;
+    }
+  }
+
+  if (!nmeaInput || !nmeaOutput) {
+    printf("Usage:\ntruewind -if=input_file_name -of=output_file_name\n");
+    exit(EXIT_FAILURE);
+  }
+
+
   double apparentWindSpeed = 16;
   double boatSpeed = 10;
   double apparentWindDirection = 35;
@@ -26,8 +56,17 @@ main() {
   char nmeaSentence[100];
   int f;
 
-  char nmeaInput[] = "/tmp/apparentAndBS";
+  struct stat st;
+  // create the output fifo file
+  if (stat(nmeaOutput, &st) != 0) {
+    mkfifo(nmeaOutput, 0666);
+  }
+
   f = open(nmeaInput, O_RDONLY);
+  if (f < 0) {
+    printf("Could not read NMEA input file %s\n", nmeaInput);
+    exit(EXIT_FAILURE);
+  }
 
   while(true) {
     if (read(f, &nmeaSentence, sizeof(char)*100) > 0) {
@@ -43,7 +82,6 @@ main() {
 
         char words[9][5];
         char *nextWord;
-        int i;
         for (i = 0; i < 9; i++) {
           //todo add some validation
           nextWord = strsep(&running, ",");
@@ -68,24 +106,68 @@ main() {
         }
         sscanf(words[1], "%lf", &apparentWindDirection);
         char leftOrRight = *words[2];
-        if (leftOrRight = 'L') {
-          apparentWindDirection = 360 - apparentWindDirection;
+        if (leftOrRight == 'L') {
+          apparentWindDirection = -apparentWindDirection;
         }
-        // todo: support more than just knots
+
+        // knots
         sscanf(words[3], "%lf", &apparentWindSpeed);
+        if (apparentWindSpeed == -1) {
+          // try and get a value in KPH
+          sscanf(words[7], "%lf", &apparentWindSpeed);
+          apparentWindSpeed = apparentWindSpeed * 0.539957; // convert to knots
+
+        }
+        if (apparentWindSpeed == -1) {
+          // try and get a value in MPH
+          sscanf(words[5], "%lf", &apparentWindSpeed);
+          apparentWindSpeed = apparentWindSpeed * 0.868976; // convert to knots
+
+        }
       }
       else if(strcmp(nmeaType, "MWV") == 0) {
         // apparent wind could also come in the form of MWV with reference R (relatve)
         //$CCMWV,60.32,R,10.5,N
-        //TODO: complete this bit
+
+        char *running;
+        running = strdup (nmeaSentence);
+
+        char words[5][5];
+        char *nextWord;
+        int i;
+        for (i = 0; i < 5; i++) {
+          //todo add some validation
+          nextWord = strsep(&running, ",");
+          strcpy(words[i], nextWord);
+        }
+
+
+        char reference = *words[2];
+        char units = *words[4];
+        if (reference == 'R') {
+          sscanf(words[1], "%lf", &apparentWindDirection);
+          sscanf(words[3], "%lf", &apparentWindSpeed);
+          // assuming N for knots as default
+          if (units == 'K') { // KPH
+            apparentWindSpeed = apparentWindSpeed * 0.539957; // convert to knots
+          }
+          else if (units == 'M') { // MPH
+            apparentWindSpeed = apparentWindSpeed * 0.868976; // convert to knots
+          }
+          else if (units != 'N') {
+            // invalid, don't use this data.
+            apparentWindSpeed = -1;
+          }
+        }
+
       }
 
 
-      // apparentWindSpeed = 16;
-      // apparentWindDirection = 35;
-
       if (boatSpeed > -1 && apparentWindSpeed > -1 && apparentWindDirection > -1) {
-        writeNMEATrueWind(boatSpeed, apparentWindSpeed, apparentWindDirection, reference, status, units);
+        bool writeSuccess = writeNMEATrueWind(boatSpeed, apparentWindSpeed, apparentWindDirection, reference, status, units);
+        if (!writeSuccess) {
+          exit(EXIT_FAILURE);
+        }
         // blank out our values to start searching again
         boatSpeed = -1;
         apparentWindSpeed = -1;
@@ -96,7 +178,7 @@ main() {
   }
 
 
-  return 0;
+  exit(EXIT_SUCCESS);
 }
 
 
@@ -131,14 +213,14 @@ bool writeNMEATrueWind(double boatSpeed, double apparentWindSpeed, double appare
   double tws = trueWindSpeed(boatSpeed, apparentWindSpeed, apparentWindDirection);
   double twd = trueWindDirection(boatSpeed, apparentWindSpeed, apparentWindDirection);
 
-  FILE *f = fopen("/tmp/trueWind", "w");
+  FILE *f = fopen(nmeaOutput, "w");
   if (f == NULL) {
-      printf("Error opening file!\n");
+      printf("Error writing to output file %s\n", nmeaOutput);
       return false;
   }
 
   /* print some text */
-  fprintf(f, "$CCMWV,%f,%c,%f,%c,%c\n", twd, reference, tws, units, status);
+  fprintf(f, "$IIMWV,%06.2f,%c,%.2f,%c,%c\n", twd, reference, tws, units, status);
 
   fclose(f);
 
