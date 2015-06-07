@@ -1,0 +1,57 @@
+******** ABOUT TRUE WIND ********
+
+truewind calculated true wind direction and speed given apparent wind direction,
+apparent wind speed and boat speed.
+
+Note that some call this "Boat Wind" and is different from the sort of true wind
+that would be calculated using GPS speed and heading.
+
+truewind reads in NMEA strings and generates NMEA strings.
+
+Supported input NMEA strings:
+VHW, VWR and MWV (with Reference = R);
+
+Supported output NMEA strings
+MWV (Reference = T);
+
+
+
+
+
+******** COMPILATION INSTRUCTIONS ********
+
+Type the following command to compile typewind.
+
+make
+
+
+
+
+******** EXECUTION ********
+
+Usage:
+truewind -if=input_file_name -of=output_file_name
+
+The output file will be created if it doesn't already exist.
+
+
+******* INTEGRATION WITH KPLEX *******
+KPlex is an NMEA multiplexer. truewind can be used to read apparent wind speed,
+apparent wind direction and boat speed from KPlex and then write to a FIFO file
+that KPlex will then consume.
+
+Config such as the following should be added to the kplex config file.
+
+
+#output data needed for process calculating true wind
+[file]
+filename=[truewind input file]
+direction=out
+persist=yes
+ofilter=+**VWR:+**VHW:+**MWV:-all
+
+#read back in the calculated true wind
+[file]
+filename=[truewind output file]
+direction=in
+persist=yes
