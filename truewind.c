@@ -1,6 +1,14 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+/* see http://www.catb.org/gpsd/NMEA.html
+* for a good NMEA reference
+*/
 
 double trueWindSpeed(double, double, double);
 double trueWindDirection(double, double, double);
@@ -12,9 +20,81 @@ main() {
   double apparentWindDirection = 35;
   char reference = 'T'; // TRUE
   char status = 'A'; // Data valid
-  char units = 'K'; // Knots
+  char units = 'N'; // Knots
 
-  writeNMEATrueWind(boatSpeed, apparentWindSpeed, apparentWindDirection, reference, status, units);
+
+  char nmeaSentence[100];
+  int f;
+
+  char nmeaInput[] = "/tmp/apparentAndBS";
+  f = open(nmeaInput, O_RDONLY);
+
+  while(true) {
+    if (read(f, &nmeaSentence, sizeof(char)*100) > 0) {
+
+      char nmeaType[4];
+      strncpy(nmeaType, nmeaSentence+3, 3);
+
+      if(strcmp(nmeaType, "VHW") == 0) {
+        // if nmeaSentence contains a VHW string with knots, parse out the boatSpeed
+        //$IIVHW,,T,,M,6.66,N,09.26,K
+        char *running;
+        running = strdup (nmeaSentence);
+
+        char words[9][5];
+        char *nextWord;
+        int i;
+        for (i = 0; i < 9; i++) {
+          //todo add some validation
+          nextWord = strsep(&running, ",");
+          strcpy(words[i], nextWord);
+        }
+        sscanf(words[5], "%lf", &boatSpeed);
+
+      }
+      else if(strcmp(nmeaType, "VWR") == 0) {
+        // if nmeaSentence contins a VWR string, parse out the wind direction and speed (knots)
+        //$IIVWR,49,L,2.4,N,01.2,M,04.4,K
+        char *running;
+        running = strdup (nmeaSentence);
+
+        char words[8][5];
+        char *nextWord;
+        int i;
+        for (i = 0; i < 8; i++) {
+          //todo add some validation
+          nextWord = strsep(&running, ",");
+          strcpy(words[i], nextWord);
+        }
+        sscanf(words[1], "%lf", &apparentWindDirection);
+        char leftOrRight = *words[2];
+        if (leftOrRight = 'L') {
+          apparentWindDirection = 360 - apparentWindDirection;
+        }
+        // todo: support more than just knots
+        sscanf(words[3], "%lf", &apparentWindSpeed);
+      }
+      else if(strcmp(nmeaType, "MWV") == 0) {
+        // apparent wind could also come in the form of MWV with reference R (relatve)
+        //$CCMWV,60.32,R,10.5,N
+        //TODO: complete this bit
+      }
+
+
+      // apparentWindSpeed = 16;
+      // apparentWindDirection = 35;
+
+      if (boatSpeed > -1 && apparentWindSpeed > -1 && apparentWindDirection > -1) {
+        writeNMEATrueWind(boatSpeed, apparentWindSpeed, apparentWindDirection, reference, status, units);
+        // blank out our values to start searching again
+        boatSpeed = -1;
+        apparentWindSpeed = -1;
+        apparentWindDirection = -1;
+      }
+
+    }
+  }
+
 
   return 0;
 }
@@ -51,7 +131,16 @@ bool writeNMEATrueWind(double boatSpeed, double apparentWindSpeed, double appare
   double tws = trueWindSpeed(boatSpeed, apparentWindSpeed, apparentWindDirection);
   double twd = trueWindDirection(boatSpeed, apparentWindSpeed, apparentWindDirection);
 
-  printf("$CCMWV,%f,%c,%f,%c,%c\n", twd, reference, tws, units, status);
+  FILE *f = fopen("/tmp/trueWind", "w");
+  if (f == NULL) {
+      printf("Error opening file!\n");
+      return false;
+  }
+
+  /* print some text */
+  fprintf(f, "$CCMWV,%f,%c,%f,%c,%c\n", twd, reference, tws, units, status);
+
+  fclose(f);
 
 
   return true;
