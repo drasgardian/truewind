@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pipe=/tmp/wind
+pipe=/opt/truewind/sampledata
 
 if [[ ! -p $pipe ]]; then
     echo "Reader not running"
