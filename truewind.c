@@ -21,7 +21,7 @@ char *nmeaInput;
 char *nmeaOutput;
 
 main(int argc, char **argv) {
-
+  
   if (argc != 3) {
     printf("Usage:\ntruewind -if=input_file_name -of=output_file_name\n");
     exit(EXIT_FAILURE);
@@ -31,12 +31,13 @@ main(int argc, char **argv) {
   for (i = 1; i < 3; i++) {
     char argType[4];
     strncpy(argType, argv[i], 4);
-    if (strcmp(argType, "-if=") ==0) {
+
+    if (strncmp(argType, "-if=", 4) ==0) {
       nmeaInput = argv[i];
       nmeaInput = nmeaInput+4;
     }
 
-    if (strcmp(argType, "-of=") ==0) {
+    if (strncmp(argType, "-of=", 4) ==0) {
       nmeaOutput = argv[i];
       nmeaOutput = nmeaOutput+4;
     }
