@@ -48,9 +48,9 @@ main(int argc, char **argv) {
   }
 
 
-  double apparentWindSpeed = 16;
-  double boatSpeed = 10;
-  double apparentWindDirection = 35;
+  double apparentWindSpeed = -1;
+  double boatSpeed = -1;
+  double apparentWindDirection = -1;
   char reference = 'T'; // TRUE
   char status = 'A'; // Data valid
   char units = 'N'; // Knots
@@ -76,7 +76,7 @@ main(int argc, char **argv) {
 
       char nmeaType[4];
       strncpy(nmeaType, nmeaSentence+3, 3);
-
+      nmeaType[3] = '\0'; // needs null terminator
       if(strcmp(nmeaType, "VHW") == 0) {
         // if nmeaSentence contains a VHW string with knots, parse out the boatSpeed
         //$IIVHW,,T,,M,6.66,N,09.26,K
@@ -110,7 +110,7 @@ main(int argc, char **argv) {
         sscanf(words[1], "%lf", &apparentWindDirection);
         char leftOrRight = *words[2];
         if (leftOrRight == 'L') {
-          apparentWindDirection = -apparentWindDirection;
+          apparentWindDirection = 360-apparentWindDirection;
         }
 
         // knots
@@ -165,7 +165,6 @@ main(int argc, char **argv) {
 
       }
 
-
       if (boatSpeed > -1 && apparentWindSpeed > -1 && apparentWindDirection > -1) {
         bool writeSuccess = writeNMEATrueWind(boatSpeed, apparentWindSpeed, apparentWindDirection, reference, status, units);
         if (!writeSuccess) {
@@ -178,6 +177,7 @@ main(int argc, char **argv) {
       }
 
     }
+
   }
 
 
@@ -199,13 +199,26 @@ double trueWindSpeed(double boatSpeed, double apparentWindSpeed, double apparent
 * returns the true wind direction given boat speed, apparent wind speed and apparent wind direction in degrees
 **/
 double trueWindDirection(double boatSpeed, double apparentWindSpeed, double apparentWindDirection) {
+
+  bool convert180 = false;
+  // formula below works with values < 180
+  if (apparentWindDirection > 180) {
+    apparentWindDirection = 360 - apparentWindDirection;
+    convert180 = true;
+  }
+
   // convert degres to radians
   double apparentWindDirectionRadian = apparentWindDirection * (M_PI/180);
 
   double twdRadians = (90 * (M_PI/180)) - atan((apparentWindSpeed*cos(apparentWindDirectionRadian) - boatSpeed) / (apparentWindSpeed*sin(apparentWindDirectionRadian)));
 
   // convert radians back to degrees
-  return twdRadians*(180/M_PI);
+  double twdDegrees = twdRadians*(180/M_PI);
+  if (convert180) {
+    twdDegrees = 360 - twdDegrees;
+  }
+
+  return twdDegrees;
 }
 
 /**
@@ -218,8 +231,7 @@ bool writeNMEATrueWind(double boatSpeed, double apparentWindSpeed, double appare
 
   FILE *f = fopen(nmeaOutput, "w");
   if (f == NULL) {
-      printf("Error writing to output file %s\n", nmeaOutput);
-      return false;
+    return false;
   }
 
   /* print some text */
