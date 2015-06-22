@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pipe=/opt/truewind/sampledata
+pipe=/tmp/trueWind
 
 if [[ ! -p $pipe ]]; then
     echo "Reader not running"
@@ -39,5 +39,5 @@ while true; do
   # waterspeed
   waterspeed=10
   echo "\$IIVHW,,T,,M,$waterspeed,N,09.26,K" > $pipe
-  sleep 0.5
+  sleep 0.25
 done
